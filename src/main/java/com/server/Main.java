@@ -99,7 +99,7 @@ public class Main extends WebSocketServer {
             case T_URL: // Se solicita la url del server (no tiene ningun tipo de sentido)
                 JSONObject response = new JSONObject()
                     .put(K_TYPE, T_URL)
-                    .put(K_MESSAGE, "matrixplay1@ieticloudpro.ieti.cat");
+                    .put(K_MESSAGE, "matrixplay1.ieti.site");
                 
                 sendSafe(conn, response.toString());
                 break;
