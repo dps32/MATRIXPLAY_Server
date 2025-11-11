@@ -4,13 +4,11 @@ import org.java_websocket.server.WebSocketServer;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.exceptions.WebsocketNotConnectedException;
-
 import org.json.JSONObject;
 
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main extends WebSocketServer {
 
@@ -29,7 +27,6 @@ public class Main extends WebSocketServer {
     private static final String T_COUNTDOWN = "countdown";
 
     private final Map<WebSocket, String> clients = new ConcurrentHashMap<>();
-    private final AtomicInteger clientIdCounter = new AtomicInteger(1);
 
     public Main(InetSocketAddress address) {
         super(address);
@@ -62,13 +59,13 @@ public class Main extends WebSocketServer {
                     .put(K_TYPE, "full")
                     .put(K_MESSAGE, "Sala llena. Solo se permiten 2 jugadores.");
             sendSafe(conn, fullMessage.toString());
-            conn.close(1000, "Sala llena"); // Cierra la conexión
+            conn.close(1000, "Sala llena");
             System.out.println("Rejected extra client: Sala llena");
             return;
         }
 
-        // Registrar jugador
-        String playerName = "PLAYER" + clientIdCounter.getAndIncrement();
+        // Asignar PLAYER1 o PLAYER2 automáticamente
+        String playerName = clients.isEmpty() ? "PLAYER1" : "PLAYER2";
         clients.put(conn, playerName);
         System.out.println("Client connected: " + playerName);
 
@@ -115,24 +112,19 @@ public class Main extends WebSocketServer {
 
     private void checkPlayersReady() {
         if (clients.size() == 2) {
-            // Obtener nombres de los jugadores
             String[] players = clients.values().toArray(new String[0]);
 
             // Enviar PLAYERS_READY a ambos
-            JSONObject readyMessage1 = new JSONObject()
-                    .put(K_TYPE, T_PLAYERS_READY)
-                    .put("opponentName", players[1]);
-            JSONObject readyMessage2 = new JSONObject()
-                    .put(K_TYPE, T_PLAYERS_READY)
-                    .put("opponentName", players[0]);
-
             int i = 0;
             for (WebSocket conn : clients.keySet()) {
-                sendSafe(conn, i == 0 ? readyMessage1.toString() : readyMessage2.toString());
+                JSONObject readyMessage = new JSONObject()
+                        .put(K_TYPE, T_PLAYERS_READY)
+                        .put("opponentName", i == 0 ? players[1] : players[0]);
+                sendSafe(conn, readyMessage.toString());
                 i++;
             }
 
-            // Enviar countdown inicial (3 segundos) a ambos
+            // Enviar countdown inicial (3 segundos)
             JSONObject countdown = new JSONObject()
                     .put(K_TYPE, T_COUNTDOWN)
                     .put("number", 3);
