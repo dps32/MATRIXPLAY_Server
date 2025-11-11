@@ -56,6 +56,18 @@ public class Main extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        // Limitar a solo 2 jugadores
+        if (clients.size() >= 2) {
+            JSONObject fullMessage = new JSONObject()
+                    .put(K_TYPE, "full")
+                    .put(K_MESSAGE, "Sala llena. Solo se permiten 2 jugadores.");
+            sendSafe(conn, fullMessage.toString());
+            conn.close(1000, "Sala llena"); // Cierra la conexión
+            System.out.println("Rejected extra client: Sala llena");
+            return;
+        }
+
+        // Registrar jugador
         String playerName = "PLAYER" + clientIdCounter.getAndIncrement();
         clients.put(conn, playerName);
         System.out.println("Client connected: " + playerName);
