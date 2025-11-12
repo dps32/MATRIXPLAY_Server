@@ -23,9 +23,11 @@ public class Main extends WebSocketServer {
     private static final String K_TYPE = "type";
     private static final String K_MESSAGE = "message";
     private static final String K_COUNTDOWN = "countdown";
+    private static final String K_NUMBER = "number";
 
     // Message Types (Client -> Server)
     private static final String T_URL = "url";
+    private static final String T_GROUPNAME = "groupname";
     
     // Message Types (Server -> Client)
     private static final String T_WELCOME = "welcome";
@@ -33,8 +35,28 @@ public class Main extends WebSocketServer {
     private final Map<WebSocket, Integer> clients = new ConcurrentHashMap<>();
     private final AtomicInteger clientIdCounter = new AtomicInteger(1);
 
+    private String serverUrl, groupName = "DefaultValue";
+
     public Main(InetSocketAddress address) {
         super(address);
+        loadConfig();
+    }
+
+    // Cargar configuración del json
+    private void loadConfig() {
+        try {
+            String content = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("config.json")));
+            JSONObject config = new JSONObject(content);
+            
+            if (config.has("serverUrl"))
+                serverUrl = config.getString("serverUrl");
+
+            if (config.has("groupName"))
+                groupName = config.getString("groupName");
+            
+        } catch (Exception e) {
+            System.err.println("Error: Could not load config.json.");
+        }
     }
 
     /**
@@ -61,25 +83,28 @@ public class Main extends WebSocketServer {
         }
     }
 
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
+
+        // Límite de 2 clientes
+        if (clients.size() >= 2) { 
+            System.out.println("Max clients reached. Closing new conn.");
+            sendSafe(conn, new JSONObject()
+                .put(K_TYPE, "error")
+                .put(K_MESSAGE, "Maximum clients connected. Connection refused.")
+                .toString());
+            conn.close();
+
+            listClients(); // listamos clientes conectados
+
+            return;
+        }
+
+        // conectamos el cliente
         int clientId = clientIdCounter.getAndIncrement();
         clients.put(conn, clientId);
         System.out.println("Client connected: Client#" + clientId);
-
-        boolean maxClientsReached = clientIdCounter.get() >= 2;
-        
-        // Límite de 2 clientes
-        // if (maxClientsReached) { 
-        //     System.out.println("Max clients reached. Closing new conn.");
-        //     sendSafe(conn, new JSONObject()
-        //         .put(K_TYPE, "error")
-        //         .put(K_MESSAGE, "Maximum clients connected. Connection refused.")
-        //         .toString());
-        //     conn.close();
-
-        //     return;
-        // }
 
         // Enviamos hola al conectarse
         JSONObject hMessage = new JSONObject()
@@ -88,10 +113,11 @@ public class Main extends WebSocketServer {
 
         broadcastToAll(hMessage.toString());
 
-        if (maxClientsReached) {
+        // countdown
+        if (clients.size() >= 2) {
             JSONObject cMessage = new JSONObject()
-                .put(K_TYPE, T_WELCOME)
-                .put(K_COUNTDOWN, 3);
+                .put(K_TYPE, K_COUNTDOWN)
+                .put(K_NUMBER, 3);
 
             broadcastToAll(cMessage.toString());
         }
@@ -118,14 +144,24 @@ public class Main extends WebSocketServer {
 
         String type = obj.optString(K_TYPE, "");
         
+        JSONObject response = null;
         // Manejar los mensajes recibidos
         switch (type) {
             case T_URL: // Se solicita la url del server (no tiene ningun tipo de sentido)
-                JSONObject response = new JSONObject()
+                response = new JSONObject()
                     .put(K_TYPE, T_URL)
-                    .put(K_MESSAGE, "wss://matrixplay1.ieti.site:443");
+                    .put(K_MESSAGE, serverUrl);
                 
                 sendSafe(conn, response.toString());
+
+                break;
+            case T_GROUPNAME: // Se solicita el nombre del grupo
+                response = new JSONObject()
+                    .put(K_TYPE, T_GROUPNAME)
+                    .put(K_MESSAGE, groupName);
+                
+                sendSafe(conn, response.toString());
+                
                 break;
             default:
                 System.out.println("Unknown message type: " + type);
@@ -165,6 +201,14 @@ public class Main extends WebSocketServer {
             new CountDownLatch(1).await();
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    // Listar clientes
+    private void listClients() {
+        for (WebSocket c : clients.keySet()) {
+            Integer id = clients.get(c);
+            System.out.println("[*] Online Client#" + id);
         }
     }
 
