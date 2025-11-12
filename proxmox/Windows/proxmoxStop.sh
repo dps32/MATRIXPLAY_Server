@@ -1,10 +1,13 @@
 #!/bin/bash
 
-source ./config.env
+source ../config.env
 
 # Obtenir configuració dels paràmetres
 USER=${1:-$DEFAULT_USER}
 RSA_PATH=${2:-$DEFAULT_RSA_PATH}
+RSA_PATH="${RSA_PATH%$'\r'}"
+# Expand tilde to home directory
+RSA_PATH="${RSA_PATH/#\~/$HOME}"
 SERVER_PORT=${3:-$DEFAULT_SERVER_PORT}
 SSH_OPTS='-oHostKeyAlgorithms=+ssh-rsa -oPubkeyAcceptedAlgorithms=+ssh-rsa'
 
@@ -14,12 +17,9 @@ echo "Server port: $SERVER_PORT"
 
 JAR_NAME="server-package.jar"
 
-cd ..
-
 # Comprovem que els arxius existeixen
 if [[ ! -f "$RSA_PATH" ]]; then
   echo "Error: No s'ha trobat el fitxer de clau privada: $RSA_PATH"
-  cd proxmox
   exit 1
 fi
 
@@ -65,5 +65,3 @@ EOF
 
 # Finalitzar l'agent SSH
 ssh-agent -k
-
-cd proxmox

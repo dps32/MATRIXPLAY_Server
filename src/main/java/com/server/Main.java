@@ -22,6 +22,7 @@ public class Main extends WebSocketServer {
     // JSON Keys
     private static final String K_TYPE = "type";
     private static final String K_MESSAGE = "message";
+    private static final String K_COUNTDOWN = "countdown";
 
     // Message Types (Client -> Server)
     private static final String T_URL = "url";
@@ -65,12 +66,35 @@ public class Main extends WebSocketServer {
         int clientId = clientIdCounter.getAndIncrement();
         clients.put(conn, clientId);
         System.out.println("Client connected: Client#" + clientId);
+
+        boolean maxClientsReached = clientIdCounter.get() >= 2;
         
+        // Límite de 2 clientes
+        // if (maxClientsReached) { 
+        //     System.out.println("Max clients reached. Closing new conn.");
+        //     sendSafe(conn, new JSONObject()
+        //         .put(K_TYPE, "error")
+        //         .put(K_MESSAGE, "Maximum clients connected. Connection refused.")
+        //         .toString());
+        //     conn.close();
+
+        //     return;
+        // }
+
         // Enviamos hola al conectarse
-        JSONObject message = new JSONObject()
+        JSONObject hMessage = new JSONObject()
             .put(K_TYPE, T_WELCOME)
             .put(K_MESSAGE, "Hola");
-        broadcastToAll(message.toString());
+
+        broadcastToAll(hMessage.toString());
+
+        if (maxClientsReached) {
+            JSONObject cMessage = new JSONObject()
+                .put(K_TYPE, T_WELCOME)
+                .put(K_COUNTDOWN, 3);
+
+            broadcastToAll(cMessage.toString());
+        }
     }
 
     @Override
@@ -99,7 +123,7 @@ public class Main extends WebSocketServer {
             case T_URL: // Se solicita la url del server (no tiene ningun tipo de sentido)
                 JSONObject response = new JSONObject()
                     .put(K_TYPE, T_URL)
-                    .put(K_MESSAGE, "matrixplay1.ieti.site");
+                    .put(K_MESSAGE, "wss://matrixplay1.ieti.site:443");
                 
                 sendSafe(conn, response.toString());
                 break;
