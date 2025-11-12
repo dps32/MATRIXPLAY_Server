@@ -87,8 +87,8 @@ public class Main extends WebSocketServer {
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
 
-        // Límite de 2 clientes
-        if (clients.size() >= 2) { 
+        // Límite de 3 clientes
+        if (clients.size() >= 3) { 
             System.out.println("Max clients reached. Closing new conn.");
             sendSafe(conn, new JSONObject()
                 .put(K_TYPE, "error")
@@ -114,7 +114,7 @@ public class Main extends WebSocketServer {
         broadcastToAll(hMessage.toString());
 
         // countdown
-        if (clients.size() >= 2) {
+        if (clients.size() >= 3) {
             JSONObject cMessage = new JSONObject()
                 .put(K_TYPE, K_COUNTDOWN)
                 .put(K_NUMBER, 3);
