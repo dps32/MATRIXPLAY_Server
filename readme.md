@@ -1,6 +1,6 @@
 # MatrixPlay Server
 
-## 📡 Protocolo de Comunicación WebSocket
+## Protocolo de Comunicación WebSocket
 
 ### Formato Base
 
@@ -15,7 +15,7 @@ Todos los mensajes siguen el formato JSON:
 
 ---
 
-## 📥 Mensajes: Cliente → Servidor
+## Mensajes: Cliente → Servidor
 
 ### `url`
 
@@ -37,7 +37,7 @@ Envía una URL al servidor.
 
 ---
 
-## 📤 Mensajes: Servidor → Cliente
+## Mensajes: Servidor → Cliente
 
 ### `welcome`
 
@@ -56,7 +56,7 @@ Mensaje de bienvenida enviado cuando un cliente se conecta.
 
 ---
 
-## 🔧 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 src/main/java/com/server/
@@ -66,7 +66,7 @@ src/main/java/com/server/
 
 ---
 
-## 🔌 Sistema de Clientes
+## Sistema de Clientes
 
 Los clientes se identifican mediante **IDs numéricos auto-incrementales**:
 
@@ -78,9 +78,9 @@ No se requiere autenticación ni registro previo.
 
 ---
 
-## 🧪 Cliente de Prueba (JavaScript)
+## Cliente de Prueba (JavaFX)
 
-```javascript
+```
 const ws = new WebSocket("ws://localhost:3000");
 
 ws.onopen = () => {
@@ -120,7 +120,7 @@ ws.onclose = () => {
 
 ---
 
-## 📊 Logs del Servidor
+## Logs del Servidor
 
 El servidor registra todas las conexiones y mensajes:
 
@@ -132,13 +132,13 @@ Client disconnected: Client#1
 
 ---
 
-## ⚙️ Configuración
+## Configuración
 
 ### Puerto del Servidor
 
 Por defecto: `3000`
 
-Para cambiar el puerto, modifica la constante en `Main.java`:
+Para cambiar el puerto, se modifica la constante en `Main.java`:
 
 ```java
 public static final int DEFAULT_PORT = 3000;
