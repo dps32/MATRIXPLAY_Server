@@ -4,11 +4,14 @@ import org.java_websocket.server.WebSocketServer;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.exceptions.WebsocketNotConnectedException;
+
 import org.json.JSONObject;
 
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main extends WebSocketServer {
 
@@ -19,17 +22,21 @@ public class Main extends WebSocketServer {
     private static final String K_MESSAGE = "message";
     private static final String K_COUNTDOWN = "countdown";
     private static final String K_NUMBER = "number";
+    private static final String K_PLAYER_ID = "player_id";
+    private static final String K_POSITION = "position";
 
     // Message Types (Client -> Server)
     private static final String T_URL = "url";
     private static final String T_GROUPNAME = "groupname";
+    private static final String T_PADDLE_MOVE = "paddle_move";
 
     // Message Types (Server -> Client)
     private static final String T_WELCOME = "welcome";
-    private static final String T_PLAYERS_READY = "players_ready";
-    private static final String T_COUNTDOWN = "countdown";
+    private static final String T_PLAYER_ASSIGNMENT = "player_assignment";
+    private static final String T_PADDLE_UPDATE = "paddle_update";
 
-    private final Map<WebSocket, String> clients = new ConcurrentHashMap<>();
+    private final Map<WebSocket, Integer> clients = new ConcurrentHashMap<>();
+    private final AtomicInteger clientIdCounter = new AtomicInteger(1);
 
     private String serverUrl, groupName = "DefaultValue";
 
@@ -55,22 +62,39 @@ public class Main extends WebSocketServer {
         }
     }
 
+    /**
+     * Envíar mensaje al cliente conectado
+     */
     private void sendSafe(WebSocket to, String payload) {
         if (to == null)
             return;
         try {
             to.send(payload);
         } catch (WebsocketNotConnectedException e) {
-            clients.remove(to);
-            System.out.println("Client disconnected during send.");
+            Integer clientId = clients.remove(to);
+            System.out.println("Client disconnected during send: Client#" + clientId);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Envía un mensaje a todos los clientes conectados.
+     */
     private void broadcastToAll(String payload) {
         for (WebSocket conn : clients.keySet()) {
             sendSafe(conn, payload);
+        }
+    }
+
+    /**
+     * Envía un mensaje a todos los clientes excepto al remitente
+     */
+    private void broadcastToOthers(WebSocket sender, String payload) {
+        for (WebSocket conn : clients.keySet()) {
+            if (conn != sender) {
+                sendSafe(conn, payload);
+            }
         }
     }
 
@@ -86,8 +110,7 @@ public class Main extends WebSocketServer {
                     .toString());
             conn.close();
 
-            listClients(); // listamos clientes conectados
-
+            listClients();
             return;
         }
 
@@ -96,14 +119,25 @@ public class Main extends WebSocketServer {
         clients.put(conn, clientId);
         System.out.println("Client connected: Client#" + clientId);
 
-        // Enviamos hola al conectarse
+        // Asignar número de jugador (1 o 2)
+        int playerNumber = clients.size();
+
+        // Enviar asignación de jugador al cliente que se conecta
+        JSONObject assignmentMessage = new JSONObject()
+                .put(K_TYPE, T_PLAYER_ASSIGNMENT)
+                .put(K_PLAYER_ID, playerNumber)
+                .put(K_MESSAGE, "You are Player " + playerNumber);
+
+        sendSafe(conn, assignmentMessage.toString());
+
+        // Enviamos hola a todos
         JSONObject hMessage = new JSONObject()
                 .put(K_TYPE, T_WELCOME)
                 .put(K_MESSAGE, "Hola");
 
         broadcastToAll(hMessage.toString());
 
-        // countdown
+        // countdown cuando hay 3 clientes
         if (clients.size() >= 3) {
             JSONObject cMessage = new JSONObject()
                     .put(K_TYPE, K_COUNTDOWN)
@@ -115,68 +149,61 @@ public class Main extends WebSocketServer {
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-        String player = clients.remove(conn);
-        System.out.println("Client disconnected: " + player);
+        Integer clientId = clients.remove(conn);
+        System.out.println("Client disconnected: Client#" + clientId);
     }
 
     @Override
     public void onMessage(WebSocket conn, String message) {
-        String player = clients.get(conn);
-        System.out.println("Message from " + player + ": " + message);
+        Integer clientId = clients.get(conn);
+        System.out.println("Message from Client#" + clientId + ": " + message);
 
         JSONObject obj;
         try {
             obj = new JSONObject(message);
         } catch (Exception ex) {
-            System.err.println("Invalid JSON from " + player);
+            System.err.println("Invalid JSON from Client#" + clientId);
             return;
         }
 
         String type = obj.optString(K_TYPE, "");
 
         JSONObject response = null;
-        // Manejar los mensajes recibidos
+
         switch (type) {
-            case T_URL: // Se solicita la url del server (no tiene ningun tipo de sentido)
+            case T_URL:
                 response = new JSONObject()
                         .put(K_TYPE, T_URL)
                         .put(K_MESSAGE, serverUrl);
-
                 sendSafe(conn, response.toString());
-
                 break;
-            case T_GROUPNAME: // Se solicita el nombre del grupo
+
+            case T_GROUPNAME:
                 response = new JSONObject()
                         .put(K_TYPE, T_GROUPNAME)
                         .put(K_MESSAGE, groupName);
-
                 sendSafe(conn, response.toString());
-
                 break;
+
+            case T_PADDLE_MOVE:
+                // Recibir movimiento de pala y redistribuir a todos los clientes
+                int playerId = obj.optInt(K_PLAYER_ID, -1);
+                int position = obj.optInt(K_POSITION, 50);
+
+                System.out.println("Paddle move - Player: " + playerId + ", Position: " + position);
+
+                // Reenviar a todos los clientes (incluyendo el que envió)
+                JSONObject paddleUpdate = new JSONObject()
+                        .put(K_TYPE, T_PADDLE_UPDATE)
+                        .put(K_PLAYER_ID, playerId)
+                        .put(K_POSITION, position);
+
+                broadcastToAll(paddleUpdate.toString());
+                break;
+
             default:
                 System.out.println("Unknown message type: " + type);
-        }
-    }
-
-    private void checkPlayersReady() {
-        if (clients.size() == 2) {
-            String[] players = clients.values().toArray(new String[0]);
-
-            // Enviar PLAYERS_READY a ambos
-            int i = 0;
-            for (WebSocket conn : clients.keySet()) {
-                JSONObject readyMessage = new JSONObject()
-                        .put(K_TYPE, T_PLAYERS_READY)
-                        .put("opponentName", i == 0 ? players[1] : players[0]);
-                sendSafe(conn, readyMessage.toString());
-                i++;
-            }
-
-            // Enviar countdown inicial (3 segundos)
-            JSONObject countdown = new JSONObject()
-                    .put(K_TYPE, T_COUNTDOWN)
-                    .put("number", 3);
-            broadcastToAll(countdown.toString());
+                break;
         }
     }
 
@@ -225,7 +252,9 @@ public class Main extends WebSocketServer {
 
     public static void main(String[] args) {
         Main server = new Main(new InetSocketAddress(DEFAULT_PORT));
+        registerShutdownHook(server);
         server.start();
         System.out.println("Server running on port " + DEFAULT_PORT + ". Press Ctrl+C to stop.");
+        awaitForever();
     }
 }
