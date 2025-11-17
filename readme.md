@@ -1,145 +1,120 @@
 # MatrixPlay Server
 
-## Protocolo de Comunicación WebSocket
+WebSocket server for a Pong game. Handles 2 players + displays.
 
-### Formato Base
+## 🚀 Run
 
-Todos los mensajes siguen el formato JSON:
+**Local:**
+
+```powershell
+.\run.ps1 com.server.Main
+```
+
+**Build:**
+
+```powershell
+.\run.ps1 com.server.Main build
+```
+
+**Deploy:**
+
+```bash
+cd proxmox/Windows
+./proxmoxRunFromWindows.sh
+```
+
+## 📡 Messages
+
+Port: `3000`. All messages are JSON. Positions go from 0.0 to 1.0.
+
+### Client → Server
+
+**Join game:**
 
 ```json
 {
-  "type": "messageType"
-  // ... campos específicos del mensaje
+  "type": "clientConfirmation"
 }
 ```
 
----
+Response: `{ "type": "playerAssigned", "playerId": 1 }`
 
-## Mensajes: Cliente → Servidor
+- First 2 clients = players (playerId 1 or 2)
+- Others = displays (playerId 0)
+- Game starts when 2 players join
 
-### `url`
-
-Envía una URL al servidor.
-
-**Request:**
+**Move paddle:**
 
 ```json
 {
-  "type": "url",
-  "data": "https://example.com"
+  "type": "paddleMove",
+  "y": 0.45
 }
 ```
 
-**Comportamiento:**
+- `y` from 0.0 (top) to 1.0 (bottom)
+- Only players can move paddles
 
-- El servidor procesa la URL recibida
-- Actualmente solo se registra en logs
+**Get server URL:**
 
----
+```json
+{ "type": "url" }
+```
 
-## Mensajes: Servidor → Cliente
+**Get group name:**
 
-### `welcome`
+```json
+{ "type": "groupname" }
+```
 
-Mensaje de bienvenida enviado cuando un cliente se conecta.
+### Server → Client
 
-**Enviado:** Automáticamente al conectarse un nuevo cliente (broadcast a todos).
+**Welcome:**
 
-**Response:**
+```json
+{ "type": "welcome", "message": "Hola" }
+```
+
+**Countdown:**
+
+```json
+{ "type": "countdown", "number": 3 }
+```
+
+**Game state (60/s):**
 
 ```json
 {
-  "type": "welcome",
-  "message": "Hola"
+  "type": "gameState",
+  "ball": { "x": 0.5, "y": 0.3 },
+  "paddle1": { "y": 0.4 },
+  "paddle2": { "y": 0.6 },
+  "score": { "player1": 2, "player2": 1 },
+  "running": true
 }
 ```
 
----
+- All values from 0.0 to 1.0
+- Multiply by screen size to get pixels
 
-## Estructura del Proyecto
+**Error:**
 
-```
-src/main/java/com/server/
-├── Main.java           - Servidor WebSocket principal
-└── ClientRegistry.java - Gestión de clientes conectados (DEPRECATED)
-```
-
----
-
-## Sistema de Clientes
-
-Los clientes se identifican mediante **IDs numéricos auto-incrementales**:
-
-- Primer cliente: `Client#1`
-- Segundo cliente: `Client#2`
-- etc.
-
-No se requiere autenticación ni registro previo.
-
----
-
-## Cliente de Prueba (JavaFX)
-
-```
-const ws = new WebSocket("ws://localhost:3000");
-
-ws.onopen = () => {
-  console.log("Connected to server");
-
-  // Enviar URL de ejemplo
-  ws.send(
-    JSON.stringify({
-      type: "url",
-      data: "https://example.com",
-    })
-  );
-};
-
-ws.onmessage = (event) => {
-  const message = JSON.parse(event.data);
-  console.log("Received:", message);
-
-  switch (message.type) {
-    case "welcome":
-      console.log("Welcome message:", message.message);
-      break;
-
-    default:
-      console.log("Unknown message type:", message.type);
-  }
-};
-
-ws.onerror = (error) => {
-  console.error("WebSocket error:", error);
-};
-
-ws.onclose = () => {
-  console.log("Disconnected from server");
-};
+```json
+{ "type": "error", "message": "..." }
 ```
 
----
+## 🎮 Game Rules
 
-## Logs del Servidor
+- **2 players**: Left paddle (Player 1) vs Right paddle (Player 2)
+- **Updates**: 60 times per second
 
-El servidor registra todas las conexiones y mensajes:
+## ⚙️ Config
 
-```
-Client connected: Client#1
-Message from Client#1: {"type":"url","data":"https://example.com"}
-Client disconnected: Client#1
-```
+Edit `src/main/resources/config.json`:
 
----
-
-## Configuración
-
-### Puerto del Servidor
-
-Por defecto: `3000`
-
-Para cambiar el puerto, se modifica la constante en `Main.java`:
-
-```java
-public static final int DEFAULT_PORT = 3000;
+```json
+{
+  "serverUrl": "wss://matrixplay1.ieti.site:443",
+  "groupName": "Schizofrenicy"
+}
 ```
