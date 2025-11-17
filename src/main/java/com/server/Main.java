@@ -7,6 +7,7 @@ import org.java_websocket.exceptions.WebsocketNotConnectedException;
 
 import org.json.JSONObject;
 
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +34,7 @@ public class Main extends WebSocketServer {
     // Message Types (Server -> Client)
     private static final String T_WELCOME = "welcome";
     private static final String T_PLAYER_ASSIGNMENT = "player_assignment";
+    private static final String T_INITIAL_POSITIONS = "init_positions";
     private static final String T_PADDLE_UPDATE = "paddle_update";
 
     private final Map<WebSocket, Integer> clients = new ConcurrentHashMap<>();
@@ -185,10 +187,30 @@ public class Main extends WebSocketServer {
                 sendSafe(conn, response.toString());
                 break;
 
+            case T_INITIAL_POSITIONS:
+                try {
+                    JSONObject init = new JSONObject()
+                        .put(K_TYPE, T_INITIAL_POSITIONS)
+                        .put("p1", new JSONObject()
+                        .put("x", 0.05)   // paleta izquierda
+                        .put("y", 0.5))
+                        .put("p2", new JSONObject()
+                        .put("x", 0.95)   // paleta derecha 
+                        .put("y", 0.5));
+
+                    System.out.println("Enviadas posiciones iniciales a cliente.");
+                    broadcastToAll(init.toString());
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                break;
+
             case T_PADDLE_MOVE:
                 // Recibir movimiento de pala y redistribuir a todos los clientes
                 int playerId = obj.optInt(K_PLAYER_ID, -1);
                 int position = obj.optInt(K_POSITION, 50);
+    
 
                 System.out.println("Paddle move - Player: " + playerId + ", Position: " + position);
 
