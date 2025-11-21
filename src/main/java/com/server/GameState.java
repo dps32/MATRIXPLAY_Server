@@ -29,7 +29,44 @@ public class GameState {
     public void update() {
         if (!gameRunning) return;
         
-        // movimiento de la pelota y colisionens
+        // Mover pelota
+        ballX += ballVelX;
+        ballY += ballVelY;
+        
+        // Colisión con arriba y abajo
+        if (ballY <= 0 || ballY >= 1.0f) {
+            ballVelY = -ballVelY;
+            ballY = Math.max(0, Math.min(1.0f, ballY));
+        }
+        
+        // Colisión con pala izquierda (jugador 1)
+        if (ballX <= 0.05f && ballY >= paddle1Y - PADDLE_HEIGHT/2 && ballY <= paddle1Y + PADDLE_HEIGHT/2) {
+            ballVelX = Math.abs(ballVelX);
+            ballX = 0.05f;
+            
+            // Calcular ángulo según posición de impacto
+            float hitPosition = (ballY - paddle1Y) / (PADDLE_HEIGHT/2);
+            ballVelY += hitPosition * 0.008f;
+        }
+        
+        // Colisión con pala derecha (jugador 2)
+        if (ballX >= 0.95f && ballY >= paddle2Y - PADDLE_HEIGHT/2 && ballY <= paddle2Y + PADDLE_HEIGHT/2) {
+            ballVelX = -Math.abs(ballVelX);
+            ballX = 0.95f;
+            
+            // Calcular ángulo según posición de impacto
+            float hitPosition = (ballY - paddle2Y) / (PADDLE_HEIGHT/2);
+            ballVelY += hitPosition * 0.008f;
+        }
+        
+        // Puntos
+        if (ballX < 0) {
+            score2++;
+            reset();
+        } else if (ballX > 1.0f) {
+            score1++;
+            reset();
+        }
     }
     
     // Resetear pelota al centro

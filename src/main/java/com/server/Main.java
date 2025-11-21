@@ -46,10 +46,20 @@ public class Main extends WebSocketServer {
     
     private GameState gameState = new GameState();
     private Thread gameLoopThread;
+    private Database db = new Database();
 
     public Main(InetSocketAddress address) {
         super(address);
         loadConfig();
+        try {
+            db.connect();
+            db.createTables();
+            System.out.println("Database initialized successfully");
+        } catch (Exception e) {
+            System.err.println("Warning: Database not available - " + e.getMessage());
+            System.err.println("Server will continue without database logging");
+            // No imprimir stack trace completo, solo advertencia
+        }
     }
 
     // Cargar configuración del json
@@ -102,6 +112,7 @@ public class Main extends WebSocketServer {
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         allClients.put(conn, true);
         System.out.println("Client connected, waiting for confirmation...");
+        db.log("CLIENT_CONNECTED", "Client connected");
 
         // Enviar bienvenida
         JSONObject hMessage = new JSONObject()
@@ -185,6 +196,7 @@ public class Main extends WebSocketServer {
                     players.put(conn, assignedPlayerId);
                     playerNames.put(assignedPlayerId, playerName);
                     System.out.println("Player" + assignedPlayerId + " (" + playerName + ") confirmed");
+                    db.log("PLAYER_CONFIRMED", "Player confirmed", assignedPlayerId, playerName);
                 } else {
                     assignedPlayerId = 0; // Display
                     System.out.println("Display confirmed");
@@ -203,6 +215,7 @@ public class Main extends WebSocketServer {
                         .put(K_TYPE, K_COUNTDOWN)
                         .put(K_NUMBER, 3);
                     broadcastToAll(cMessage.toString());
+                    db.log("COUNTDOWN_STARTED", "Game countdown started");
                     
                     // Enviar nombres de ambos jugadores
                     JSONObject namesMessage = new JSONObject()
@@ -212,11 +225,12 @@ public class Main extends WebSocketServer {
                     broadcastToAll(namesMessage.toString());
 
                     try {
-                        Thread.sleep(3000); // esperar 3 segundos
+                        Thread.sleep(3000);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
-                    startGameLoop(); // empezar juego loop
+                    db.log("GAME_STARTED", "Game started");
+                    startGameLoop();
                 }
                 break;
             
@@ -327,7 +341,7 @@ public class Main extends WebSocketServer {
 
 
 
-    
+
     public static void main(String[] args) {
         Main server = new Main(new InetSocketAddress(DEFAULT_PORT));
         registerShutdownHook(server);
