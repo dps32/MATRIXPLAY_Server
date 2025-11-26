@@ -132,9 +132,9 @@ public class Main extends WebSocketServer {
             playerNames.remove(playerId);
             System.out.println("Player" + playerId + " disconnected");
             
-            // Parar juego si no hay 2 jugadores
+            // Si un jugador se desconecta, reiniciar partida
             if (players.size() < 2) {
-                stopGameLoop();
+                resetMatch();
             }
         } else {
             System.out.println("Display disconnected");
@@ -310,6 +310,14 @@ public class Main extends WebSocketServer {
                 // el gameState a todos los clientes
                 broadcastToAll(gameState.toJSON().toString());
                 
+                // Verificar si alguien tiene 10 puntos
+                if (gameState.getScore1() >= 10 || gameState.getScore2() >= 10) {
+                    System.out.println("Game finished! Final score: " + gameState.getScore1() + " - " + gameState.getScore2());
+
+                    resetMatch();
+                    break;
+                }
+                
                 // Sleep para mantener FPS
                 long elapsed = System.currentTimeMillis() - startTime;
                 long sleepTime = frameTime - elapsed;
@@ -337,6 +345,30 @@ public class Main extends WebSocketServer {
         if (gameLoopThread != null) {
             gameLoopThread.interrupt();
         }
+    }
+    
+    // Reiniciar partida y desconectar jugadores confirmados
+    private void resetMatch() {
+        stopGameLoop();
+        gameState.resetGame();
+
+        
+        // Desconectar todos los clientes confirmados
+        for (WebSocket conn : confirmedClients.keySet()) {
+            try {
+                conn.close();
+            } catch (Exception e) {
+                System.err.println("Error disconnecting client: " + e.getMessage());
+            }
+        }
+        
+        // Limpiar las listas
+        players.clear();
+        confirmedClients.clear();
+        playerNames.clear();
+
+        
+        System.out.println("Match reset, waiting for new players...");
     }
 
 

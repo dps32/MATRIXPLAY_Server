@@ -25,9 +25,16 @@ public class GameState {
     
     // Estado del juego
     private boolean gameRunning = false;
+    private int pauseFrames = 0; // Contador para pausar después de reset
     
     public void update() {
         if (!gameRunning) return;
+        
+        // Si está en pausa, decrementar contador y no mover pelota
+        if (pauseFrames > 0) {
+            pauseFrames--;
+            return;
+        }
         
         // Mover pelota
         ballX += ballVelX;
@@ -72,9 +79,26 @@ public class GameState {
     // Resetear pelota al centro
     public void reset() {
         ballX = 0.5f;
-        ballY = 0.5f;
-        ballVelX = (Math.random() > 0.5 ? 0.01f : -0.01f); // direccion aleatoria
-        ballVelY = (float)((Math.random() - 0.5) * 0.01); // lo mismo
+        // Aparecer arriba (0.0) o abajo (1.0) aleatoriamente
+        ballY = Math.random() > 0.5 ? 0.0f : 1.0f;
+        
+        // Dirección hacia izquierda (0.05, 0.5) o derecha (0.95, 0.5)
+        boolean toRight = Math.random() > 0.5;
+        float targetX = toRight ? 0.95f : 0.05f;
+        float targetY = 0.5f;
+        
+        // Calcular vctor de dirección
+        float dirX = targetX - ballX;
+        float dirY = targetY - ballY;
+        
+        // Normalizar y escalar a velocidad deseada
+        float length = (float)Math.sqrt(dirX * dirX + dirY * dirY);
+        float speed = 0.01f;
+        ballVelX = (dirX / length) * speed;
+        ballVelY = (dirY / length) * speed;
+        
+        // Pausar 1 segundo (60 frames a 60 FPS)
+        pauseFrames = 60;
     }
     
 
@@ -130,9 +154,29 @@ public class GameState {
         return json;
     }
 
-
     
     public boolean isRunning() {
         return gameRunning;
+    }
+
+    
+    public int getScore1() {
+        return score1;
+    }
+    
+    public int getScore2() {
+        return score2;
+    }
+    
+
+    // Resetear todo el juego
+    public void resetGame() {
+        score1 = 0;
+        score2 = 0;
+        paddle1Y = 0.5f;
+        paddle2Y = 0.5f;
+        pauseFrames = 0;
+        reset();
+        gameRunning = false;
     }
 }
